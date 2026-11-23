@@ -1,168 +1,211 @@
-// Combat: Rico himself, his fists and his pistol, and the damage model.
-// Shooting is a hitscan ray from the camera through the crosshair; punching
-// is a short-range arc in front of the player. Hitting a bystander or a cop
-// is a crime — the police module hears about it through the callback.
+// Solmar Bay — combat: Rico on foot, fists and pistol, and the rival
+// guards who shoot back.
+//
+// The guard engagement leash: a guard remembers the spot where it spawned.
+// It only chases and only shoots while Rico is within 45 units of that
+// home post. Break away past 45 and the guard holds its ground instead of
+// gunning Rico down across the whole map — that is what makes the long
+// walk back down Pier 9 survivable.
 
 const THREE = window.THREE;
 
-export const WEAPONS = {
-  fists: { name: 'Fists', damage: 12, range: 2.4, rate: 0.38, ammo: Infinity },
-  pistol: { name: 'Pistol', damage: 26, range: 70, rate: 0.22, ammo: 12 },
-};
+import { slideMove } from './city.js';
 
-// Rico: orange shirt, dark jeans, the wheelman of Solmar Bay.
-export function createPlayerMesh() {
-  const g = new THREE.Group();
-  const shirt = new THREE.MeshLambertMaterial({ color: 0xe86a1a });
-  const skin = new THREE.MeshLambertMaterial({ color: 0xe8b88a });
-  const jeans = new THREE.MeshLambertMaterial({ color: 0x2a3a5a });
+export const GUARD_LEASH = 45;
+export const GUARD_HEALTH = 50;
+export const GUARD_SPEED = 3.6;
+export const GUARD_SHOOT_RANGE = 32;
+export const GUARD_SHOT_DELAY = 1.5;
+export const GUARD_SHOT_DAMAGE = 8;
 
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.9, 0.28), jeans);
-  legL.position.set(-0.18, 0.45, 0);
-  const legR = legL.clone();
-  legR.position.x = 0.18;
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.9, 0.44), shirt);
-  torso.position.y = 1.35;
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.75, 0.22), shirt);
-  armL.position.set(-0.52, 1.38, 0);
-  const armR = armL.clone();
-  armR.position.x = 0.52;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 0.44), skin);
-  head.position.y = 2.02;
-  const hair = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.16, 0.48), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
-  hair.position.y = 2.26;
-  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.5), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
-  gun.position.set(0.52, 1.15, 0.25);
-  gun.visible = false;
-  g.add(legL, legR, torso, armL, armR, head, hair, gun);
-  g.userData = { legL, legR, armL, armR, torso, gun };
-  return g;
+export function makePlayerMesh() {
+  const group = new THREE.Group();
+  const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const jacket = new THREE.MeshLambertMaterial({ color: 0x2a4a6a });
+  const jeans = new THREE.MeshLambertMaterial({ color: 0x2e3440 });
+  const skin = new THREE.MeshLambertMaterial({ color: 0xd8a878 });
+  const torso = new THREE.Mesh(boxGeo, jacket);
+  torso.scale.set(0.9, 1.1, 0.5);
+  torso.position.y = 1.25;
+  torso.castShadow = true;
+  group.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), skin);
+  head.position.y = 2.05;
+  head.castShadow = true;
+  group.add(head);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.33, 10, 8), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+  hair.scale.set(1, 0.6, 1);
+  hair.position.y = 2.2;
+  group.add(hair);
+  for (const dx of [-0.22, 0.22]) {
+    const leg = new THREE.Mesh(boxGeo, jeans);
+    leg.scale.set(0.32, 0.9, 0.4);
+    leg.position.set(dx, 0.45, 0);
+    group.add(leg);
+    const arm = new THREE.Mesh(boxGeo, jacket);
+    arm.scale.set(0.24, 0.9, 0.3);
+    arm.position.set(dx * 2.4, 1.25, 0);
+    group.add(arm);
+  }
+  return group;
 }
 
-export function createCombat(scene, callbacks) {
-  const raycaster = new THREE.Raycaster();
-  const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe95a, transparent: true, opacity: 0.9 });
-  let cooldown = 0;
-  let tracers = [];
-  let flashUntil = 0;
+function makeGuardMesh() {
+  const group = new THREE.Group();
+  const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const shirt = new THREE.MeshLambertMaterial({ color: 0x8a2a2a });
+  const pants = new THREE.MeshLambertMaterial({ color: 0x1e1e24 });
+  const skin = new THREE.MeshLambertMaterial({ color: 0xc89878 });
+  const torso = new THREE.Mesh(boxGeo, shirt);
+  torso.scale.set(0.9, 1.1, 0.5);
+  torso.position.y = 1.25;
+  torso.castShadow = true;
+  group.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), skin);
+  head.position.y = 2.05;
+  group.add(head);
+  for (const dx of [-0.22, 0.22]) {
+    const leg = new THREE.Mesh(boxGeo, pants);
+    leg.scale.set(0.32, 0.9, 0.4);
+    leg.position.set(dx, 0.45, 0);
+    group.add(leg);
+  }
+  return group;
+}
 
-  function addTracer(from, to) {
-    const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
-    const line = new THREE.Line(geo, tracerMat);
-    scene.add(line);
-    tracers.push({ line, life: 0.12 });
+export class Combat {
+  constructor(scene, city, ctx) {
+    this.scene = scene;
+    this.city = city;
+    this.ctx = ctx; // { damagePlayer, onShoot }
+    this.guards = [];
+    this.weapon = 'fists';
+    this.ammo = 12;
+    this.magSize = 12;
+    this.punchTimer = 0;
+    this.shotTimer = 0;
   }
 
-  function shootableMeshes(peds, cops, traffic) {
-    const meshes = [];
-    for (const ped of peds) {
-      if (ped.health > 0) meshes.push({ mesh: ped.mesh, kind: 'ped', ref: ped });
+  get guardCount() {
+    return this.guards.length;
+  }
+
+  guardPositions() {
+    return this.guards.map((g) => ({ x: g.x, z: g.z }));
+  }
+
+  setWeapon(name) {
+    if (name === 'pistol' || name === 'fists') this.weapon = name;
+  }
+
+  reload() {
+    this.ammo = this.magSize;
+  }
+
+  spawnGuard(x, z) {
+    const mesh = makeGuardMesh();
+    mesh.position.set(x, 0, z);
+    this.scene.add(mesh);
+    const guard = {
+      mesh, x, z, home: { x, z }, health: GUARD_HEALTH,
+      shootTimer: 0.5 + Math.random() * 0.8, heading: 0,
+    };
+    this.guards.push(guard);
+    return guard;
+  }
+
+  clearGuards() {
+    for (const g of this.guards) this.scene.remove(g.mesh);
+    this.guards = [];
+  }
+
+  damageGuard(guard, amount) {
+    guard.health -= amount;
+    if (guard.health <= 0) {
+      this.scene.remove(guard.mesh);
+      this.guards = this.guards.filter((g) => g !== guard);
+      return true;
     }
-    for (const cop of cops) meshes.push({ mesh: cop.mesh, kind: 'cop', ref: cop });
-    for (const car of traffic) meshes.push({ mesh: car.mesh, kind: 'car', ref: car });
-    return meshes;
+    return false;
   }
 
-  return {
-    get cooldown() {
-      return cooldown;
-    },
-    update(dt, now) {
-      cooldown = Math.max(0, cooldown - dt);
-      for (let i = tracers.length - 1; i >= 0; i -= 1) {
-        tracers[i].life -= dt;
-        if (tracers[i].life <= 0) {
-          scene.remove(tracers[i].line);
-          tracers[i].line.geometry.dispose();
-          tracers.splice(i, 1);
-        }
-      }
-    },
-    // Fire the current weapon. Returns a report of what happened.
-    fire(player, weapon, camera, peds, cops, traffic, now) {
-      if (cooldown > 0) return { fired: false };
-      const spec = WEAPONS[weapon];
-      if (!spec) return { fired: false };
-      cooldown = spec.rate;
-      const origin = new THREE.Vector3(player.x, player.y + 1.6, player.z);
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      if (weapon === 'fists') {
-        // Punch: anything living within range and roughly in front.
-        const fx = Math.sin(player.heading);
-        const fz = Math.cos(player.heading);
-        let hit = null;
-        for (const ped of peds) {
-          if (ped.health <= 0) continue;
-          const dx = ped.mesh.position.x - player.x;
-          const dz = ped.mesh.position.z - player.z;
-          const d = Math.hypot(dx, dz);
-          if (d < spec.range && (dx * fx + dz * fz) / Math.max(d, 0.01) > 0.3) {
-            hit = { kind: 'ped', ref: ped };
-            break;
-          }
-        }
-        if (hit) {
-          hit.ref.health -= spec.damage;
-          if (hit.ref.health <= 0) {
-            hit.ref.mesh.rotation.x = -Math.PI / 2;
-            hit.ref.mesh.position.y = 0.4;
-          }
-          callbacks.onCrime(25, 'assault');
-          return { fired: true, hit: 'ped', target: hit.ref };
-        }
-        return { fired: true, hit: null };
-      }
-      // Pistol: hitscan against people, cops and cars.
-      raycaster.set(origin, dir);
-      raycaster.far = spec.range;
-      const targets = shootableMeshes(peds, cops, traffic);
-      const meshes = targets.map((t) => t.mesh);
-      // Raycast against children too (car bodies are groups).
-      const hits = raycaster.intersectObjects(meshes, true);
-      const end = origin.clone().add(dir.clone().multiplyScalar(spec.range));
-      if (hits.length) {
-        const hitPoint = hits[0].point;
-        addTracer(origin, hitPoint);
-        let obj = hits[0].object;
-        while (obj.parent && obj.parent !== scene) obj = obj.parent;
-        const target = targets.find((t) => t.mesh === obj);
-        if (target) {
-          if (target.kind === 'ped') {
-            target.ref.health -= spec.damage;
-            if (target.ref.health <= 0) {
-              target.ref.mesh.rotation.x = -Math.PI / 2;
-              target.ref.mesh.position.y = 0.4;
-            }
-            callbacks.onCrime(45, 'shooting');
-            return { fired: true, hit: 'ped', target: target.ref, point: hitPoint };
-          }
-          if (target.kind === 'cop') {
-            callbacks.onCrime(50, 'shooting a cop');
-            callbacks.onCopShot(target.ref, spec.damage);
-            return { fired: true, hit: 'cop', target: target.ref, point: hitPoint };
-          }
-          if (target.kind === 'car') {
-            return { fired: true, hit: 'car', target: target.ref, point: hitPoint };
-          }
-        }
-        return { fired: true, hit: 'wall', point: hitPoint };
-      }
-      addTracer(origin, end);
-      callbacks.onCrime(8, 'discharging a weapon');
-      return { fired: true, hit: null };
-    },
-    // Damage the player; returns true when the player just died.
-    hurtPlayer(player, amount, now) {
-      if (player.dead) return false;
-      player.health -= amount;
-      player.lastHurtAt = now;
-      if (player.health <= 0) {
-        player.health = 0;
-        player.dead = true;
+  // Shoot at a ground point: the nearest guard close to that point and
+  // within pistol range takes a 26-damage hit. Auto-reloads on empty.
+  shootAt(x, z, from) {
+    if (this.ammo <= 0) this.reload();
+    this.ammo -= 1;
+    this.shotTimer = 0.22;
+    if (this.ctx.onShoot) this.ctx.onShoot();
+    let best = null, bestD = 6;
+    for (const g of this.guards) {
+      const dTarget = Math.hypot(g.x - x, g.z - z);
+      const dFrom = Math.hypot(g.x - from.x, g.z - from.z);
+      if (dTarget < bestD && dFrom <= 70) { best = g; bestD = dTarget; }
+    }
+    if (best) {
+      this.damageGuard(best, 26);
+      return true;
+    }
+    return false;
+  }
+
+  // A punch: 12 damage to the nearest guard (or cop on foot) in reach.
+  punch(from, heading) {
+    if (this.punchTimer > 0) return false;
+    this.punchTimer = 0.38;
+    const fx = Math.sin(heading), fz = Math.cos(heading);
+    for (const g of this.guards) {
+      const dx = g.x - from.x, dz = g.z - from.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 2.4 && (dx * fx + dz * fz) > 0) {
+        this.damageGuard(g, 12);
         return true;
       }
-      return false;
-    },
-  };
+    }
+    return false;
+  }
+
+  update(dt, player) {
+    this.punchTimer = Math.max(0, this.punchTimer - dt);
+    this.shotTimer = Math.max(0, this.shotTimer - dt);
+    for (const g of [...this.guards]) {
+      const dHome = Math.hypot(player.x - g.home.x, player.z - g.home.z);
+      const dPlayer = Math.hypot(player.x - g.x, player.z - g.z);
+      if (dHome <= GUARD_LEASH) {
+        // Inside the leash: close in, and shoot inside 32 units — but only
+        // at Rico on foot. A guard holds fire on a moving car: the cops
+        // are the threat on a hot escape, not a foot soldier's pistol.
+        if (dPlayer > 4) {
+          const nx = g.x + ((player.x - g.x) / dPlayer) * GUARD_SPEED * dt;
+          const nz = g.z + ((player.z - g.z) / dPlayer) * GUARD_SPEED * dt;
+          const moved = slideMove(g.x, g.z, nx - g.x, nz - g.z, 0.8, this.city.colliders.concat(this.city.waterColliders));
+          g.x = moved.x;
+          g.z = moved.z;
+          g.heading = Math.atan2(player.x - g.x, player.z - g.z);
+        }
+        if (dPlayer <= GUARD_SHOOT_RANGE && !player.inCar) {
+          g.shootTimer -= dt;
+          if (g.shootTimer <= 0) {
+            g.shootTimer = GUARD_SHOT_DELAY;
+            if (this.ctx.damagePlayer) this.ctx.damagePlayer(GUARD_SHOT_DAMAGE);
+            if (this.ctx.onGuardShot) this.ctx.onGuardShot();
+          }
+        } else {
+          g.shootTimer = Math.max(g.shootTimer, 0.3);
+        }
+      } else {
+        // Outside the leash: hold ground, drift back toward the post.
+        const dBack = Math.hypot(g.home.x - g.x, g.home.z - g.z);
+        if (dBack > 2) {
+          const nx = g.x + ((g.home.x - g.x) / dBack) * 2 * dt;
+          const nz = g.z + ((g.home.z - g.z) / dBack) * 2 * dt;
+          const moved = slideMove(g.x, g.z, nx - g.x, nz - g.z, 0.8, this.city.colliders.concat(this.city.waterColliders));
+          g.x = moved.x;
+          g.z = moved.z;
+        }
+      }
+      g.mesh.position.set(g.x, 0, g.z);
+      g.mesh.rotation.y = g.heading;
+    }
+  }
 }

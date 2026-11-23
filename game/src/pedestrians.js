@@ -1,158 +1,100 @@
-// Pedestrians: the people who make Solmar Bay feel alive. They stroll the
-// sidewalks, cross streets at corners, scatter when a gun goes off or a police
-// siren gets close, and — when the player picks a fight — some of them fight
-// back.
+// Solmar Bay — pedestrians. Sidewalk walkers who stroll the grid and
+// scatter when trouble starts: a wanted level, a gunshot, or a car
+// bearing down on them sends them running for the nearest corner.
 
 const THREE = window.THREE;
 
-const SHIRTS = [0xd8e4e8, 0xe86a5a, 0x5a8ad8, 0xe8c33a, 0x8a5ad8, 0x4a9a6a, 0xd88a3a, 0x9a9a9a];
-const SKINS = [0xe8b88a, 0xc98a5a, 0x8a5a3a, 0xf0c8a0, 0xa86a42];
+import { slideMove } from './city.js';
 
-// A blocky person: legs, torso, arms, head. Limbs swing while walking.
-export function createPersonMesh(rng) {
-  const g = new THREE.Group();
-  const shirt = new THREE.MeshLambertMaterial({ color: rng.pick(SHIRTS) });
-  const skin = new THREE.MeshLambertMaterial({ color: rng.pick(SKINS) });
-  const pants = new THREE.MeshLambertMaterial({ color: rng.pick([0x2a3a5a, 0x3a3a3a, 0x5a4a3a, 0x6a2a2a]) });
-
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.85, 0.26), pants);
-  legL.position.set(-0.17, 0.43, 0);
-  const legR = legL.clone();
-  legR.position.x = 0.17;
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.85, 0.4), shirt);
-  torso.position.y = 1.28;
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), shirt);
-  armL.position.set(-0.48, 1.3, 0);
-  const armR = armL.clone();
-  armR.position.x = 0.48;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), skin);
+function makePedMesh(color) {
+  const group = new THREE.Group();
+  const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const shirt = new THREE.MeshLambertMaterial({ color });
+  const pants = new THREE.MeshLambertMaterial({ color: 0x2e3440 });
+  const skin = new THREE.MeshLambertMaterial({ color: 0xd8a878 });
+  const torso = new THREE.Mesh(boxGeo, shirt);
+  torso.scale.set(0.8, 1.0, 0.45);
+  torso.position.y = 1.2;
+  torso.castShadow = true;
+  group.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), skin);
   head.position.y = 1.95;
-  // Hair cap on some pedestrians.
-  if (rng.chance(0.6)) {
-    const hair = new THREE.Mesh(
-      new THREE.BoxGeometry(0.46, 0.16, 0.46),
-      new THREE.MeshLambertMaterial({ color: rng.pick([0x1a1a1a, 0x4a2a12, 0x8a8a8a, 0xd8b25a]) }),
-    );
-    hair.position.y = 2.18;
-    g.add(hair);
+  group.add(head);
+  for (const dx of [-0.2, 0.2]) {
+    const leg = new THREE.Mesh(boxGeo, pants);
+    leg.scale.set(0.3, 0.85, 0.35);
+    leg.position.set(dx, 0.42, 0);
+    group.add(leg);
   }
-  g.add(legL, legR, torso, armL, armR, head);
-  g.userData = { legL, legR, armL, armR, torso };
-  return g;
+  return group;
 }
 
-export function spawnPedestrians(rng, city, count) {
-  const peds = [];
-  for (let i = 0; i < count; i += 1) {
-    const mesh = createPersonMesh(rng);
-    let x = rng.range(-230, 230);
-    let z = rng.range(-230, 230);
-    // Prefer sidewalks: nudge onto a street edge rather than inside a block.
-    if (city.hitsSolid(x, z, 1)) {
-      x = Math.round(x / 46) * 46 + 9;
-      z = Math.round(z / 46) * 46 + 9;
-    }
-    mesh.position.set(x, 0, z);
-    peds.push({
-      mesh,
-      heading: rng.range(0, Math.PI * 2),
-      speed: rng.range(1.2, 2.2),
-      walkPhase: rng.range(0, Math.PI * 2),
-      state: 'stroll',
-      fear: 0,
-      health: 30,
-      targetX: x,
-      targetZ: z,
-      retarget: rng.range(2, 8),
-      fighting: false,
-    });
-  }
-  return peds;
-}
-
-function pickStrollTarget(ped, rng, city) {
-  for (let tries = 0; tries < 6; tries += 1) {
-    const x = ped.mesh.position.x + rng.range(-50, 50);
-    const z = ped.mesh.position.z + rng.range(-50, 50);
-    if (!city.hitsSolid(x, z, 1) && Math.abs(x) < 245 && Math.abs(z) < 245) {
-      ped.targetX = x;
-      ped.targetZ = z;
-      return;
+export class Pedestrians {
+  constructor(scene, rng, city) {
+    this.scene = scene;
+    this.city = city;
+    this.rng = rng;
+    this.peds = [];
+    this.scatterTimer = 0;
+    const colors = [0xc85a5a, 0x5a8ac8, 0x5ac88a, 0xc8b85a, 0x8a5ac8, 0xd8d8d0];
+    for (let i = 0; i < 24; i += 1) {
+      const mesh = makePedMesh(colors[i % colors.length]);
+      const street = rng.pick(city.streets || []);
+      const along = rng.range(-240, 240);
+      const vertical = rng.chance(0.5);
+      const x = vertical ? street + rng.pick([-5.5, 5.5]) : along;
+      const z = vertical ? along : street + rng.pick([-5.5, 5.5]);
+      mesh.position.set(x, 0, z);
+      scene.add(mesh);
+      this.peds.push({
+        mesh, x, z,
+        heading: rng.range(0, Math.PI * 2),
+        speed: rng.range(1.2, 2),
+        panic: 0,
+        turnTimer: rng.range(2, 8),
+      });
     }
   }
-  ped.targetX = ped.mesh.position.x;
-  ped.targetZ = ped.mesh.position.z;
-}
 
-export function updatePedestrians(peds, dt, city, rng, danger) {
-  for (const ped of peds) {
-    if (ped.health <= 0) continue; // down — stays down until respawned by main
-    const pos = ped.mesh.position;
-    // Fear: gunshots and nearby sirens make people run away from the danger.
-    if (danger && danger.active) {
-      const dx = pos.x - danger.x;
-      const dz = pos.z - danger.z;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < 900) {
-        ped.state = 'flee';
-        ped.fear = 3;
-        ped.targetX = pos.x + (dx / Math.max(1, Math.sqrt(d2))) * 60;
-        ped.targetZ = pos.z + (dz / Math.max(1, Math.sqrt(d2))) * 60;
+  get count() {
+    return this.peds.length;
+  }
+
+  scatter() {
+    this.scatterTimer = 3;
+  }
+
+  update(dt, player, wanted) {
+    this.scatterTimer = Math.max(0, this.scatterTimer - dt);
+    for (const p of this.peds) {
+      const dPlayer = Math.hypot(player.x - p.x, player.z - p.z);
+      if (wanted > 0 || this.scatterTimer > 0 || dPlayer < 6) {
+        // Run away from the trouble.
+        p.panic = Math.max(p.panic, 2);
+        p.heading = Math.atan2(p.x - player.x, p.z - player.z);
       }
-    }
-    if (ped.fear > 0) {
-      ped.fear -= dt;
-      if (ped.fear <= 0 && ped.state === 'flee') ped.state = 'stroll';
-    }
-    if (ped.state === 'stroll') {
-      ped.retarget -= dt;
-      const dx = ped.targetX - pos.x;
-      const dz = ped.targetZ - pos.z;
-      if (dx * dx + dz * dz < 4 || ped.retarget <= 0) {
-        pickStrollTarget(ped, rng, city);
-        ped.retarget = rng.range(4, 10);
+      if (p.panic > 0) {
+        p.panic -= dt;
+        p.speed = 5.5;
+      } else {
+        p.speed = 1.6;
+        p.turnTimer -= dt;
+        if (p.turnTimer <= 0) {
+          p.turnTimer = this.rng.range(3, 9);
+          p.heading += this.rng.pick([-Math.PI / 2, Math.PI / 2, 0, Math.PI]);
+        }
       }
-    }
-    const dx = ped.targetX - pos.x;
-    const dz = ped.targetZ - pos.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist > 0.5) {
-      const want = Math.atan2(dx, dz);
-      let diff = want - ped.heading;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      ped.heading += Math.max(-3 * dt, Math.min(3 * dt, diff));
-      const speed = ped.state === 'flee' ? ped.speed * 2.6 : ped.speed;
-      city.slideMove(pos, Math.sin(ped.heading) * speed * dt, Math.cos(ped.heading) * speed * dt, 0.6);
-      ped.walkPhase += dt * speed * 4;
-      const swing = Math.sin(ped.walkPhase) * (ped.state === 'flee' ? 0.7 : 0.45);
-      ped.mesh.userData.legL.rotation.x = swing;
-      ped.mesh.userData.legR.rotation.x = -swing;
-      ped.mesh.userData.armL.rotation.x = -swing * 0.8;
-      ped.mesh.userData.armR.rotation.x = swing * 0.8;
-    } else {
-      ped.mesh.userData.legL.rotation.x *= 0.9;
-      ped.mesh.userData.legR.rotation.x *= 0.9;
-      ped.mesh.userData.armL.rotation.x *= 0.9;
-      ped.mesh.userData.armR.rotation.x *= 0.9;
-    }
-    ped.mesh.rotation.y = -ped.heading;
-  }
-}
-
-// Find the nearest living pedestrian to a point.
-export function nearestPed(peds, x, z, maxDist) {
-  let best = null;
-  let bestD = maxDist * maxDist;
-  for (const ped of peds) {
-    if (ped.health <= 0) continue;
-    const dx = ped.mesh.position.x - x;
-    const dz = ped.mesh.position.z - z;
-    const d2 = dx * dx + dz * dz;
-    if (d2 < bestD) {
-      bestD = d2;
-      best = ped;
+      const dx = Math.sin(p.heading) * p.speed * dt;
+      const dz = Math.cos(p.heading) * p.speed * dt;
+      const moved = slideMove(
+        p.x, p.z, dx, dz, 0.6,
+        this.city.colliders.concat(this.city.waterColliders),
+      );
+      if (moved.hit) p.heading += Math.PI / 2;
+      p.x = Math.max(-255, Math.min(255, moved.x));
+      p.z = Math.max(-255, Math.min(255, moved.z));
+      p.mesh.position.set(p.x, 0, p.z);
+      p.mesh.rotation.y = p.heading;
     }
   }
-  return best;
 }

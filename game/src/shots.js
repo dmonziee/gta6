@@ -1,80 +1,62 @@
-// The four screenshot scenes behind `?shot=chase|drive|marina|mission`.
-// Each one plays the real game forward from a fresh world for a fixed number
-// of steps, steered by a simple autopilot, so the frame is what a short game
-// really looks like — and the same seed always gives the same frame. The
-// cover (chase) shows a police pursuit with wanted stars, the minimap and a
-// mission objective all on the HUD at once.
-
-import { PLACES } from './city.js';
+// Solmar Bay — the four staged screenshots. Each scene plays the real game
+// forward from a fresh world for a fixed number of steps, steered by the
+// game's own autopilot, so every frame is what a short stretch of real play
+// looks like and the same seed always gives the same frame.
+//
+//   chase   — a police chase: mission 1, Rico at (0, 130) facing east in a
+//             blue sedan, three stars, seven seconds east along the Marina
+//             Docks street, cops pulled in behind, camera flipped to look
+//             back west so the cruisers are visible behind him.
+//   drive   — a red sports car driving east on a street, free roam.
+//   marina  — Rico on foot at the end of Pier 9, facing west, standing.
+//   finale  — the Solmar job: Rico at Casino Solmar's door, four stars.
 
 const STEP = 1 / 60;
 
-function driveForward(game, dt, seconds, steerTo) {
-  const steps = Math.round(seconds / STEP);
-  for (let i = 0; i < steps; i += 1) {
-    game.shotInput.forward = true;
-    game.shotInput.steerTo = steerTo;
-    game.stepShot(STEP);
+export function stageShot(name, G) {
+  if (name === 'chase') {
+    G.startMission(0);
+    G.teleport(0, 130, Math.PI / 2);
+    G.spawnPlayerCar('sedan', 0, 130, Math.PI / 2, 0x2a5fd8);
+    G.setWanted(3);
+    G.setCameraFollow(Math.PI / 2 + Math.PI);
+    G.setAutoDrive(true, Math.PI / 2);
+    for (let i = 0; i < 420; i += 1) G.step(STEP); // seven seconds east
+    G.setAutoDrive(false, null);
+    // Pull the pursuing cruisers in behind the car for the frame.
+    const c = G.carState();
+    if (c) {
+      G.spawnCopAt(c.x - 16, c.z + 3);
+      G.spawnCopAt(c.x - 26, c.z - 3);
+      // Flip the camera: east of the car, looking back west at the chase.
+      G.setCameraFixed(c.x + 20, 7, c.z, c.x - 14, 2, c.z);
+    }
+    return true;
   }
-  game.shotInput.forward = false;
-}
-
-function standStill(game, seconds) {
-  const steps = Math.round(seconds / STEP);
-  for (let i = 0; i < steps; i += 1) game.stepShot(STEP);
-}
-
-// Set `game` to the named scene and leave it painted and ready. Returns the
-// scene name for the HUD caption.
-export function stageShot(name, game) {
-  game.resetWorld();
   if (name === 'drive') {
-    // Sports car at speed on a long East End street, traffic around. The
-    // car starts ON the street (z=85), not inside a block: a block start
-    // pins it against a building and the camera clips into the facade.
-    game.teleportPlayer(60, 85, Math.PI / 2);
-    game.spawnPlayerCar('sport', 0xc23a2e);
-    game.setCameraShot(Math.PI / 2, 0.32, 11);
-    game.startFreeRoam();
-    driveForward(game, STEP, 4.5, Math.PI / 2);
-    return 'drive';
+    G.startFreeRoam();
+    G.teleport(60, 85, Math.PI / 2);
+    G.spawnPlayerCar('sport', 60, 85, Math.PI / 2, 0xd81f2a);
+    G.setCameraFollow(Math.PI / 2 + Math.PI);
+    G.setAutoDrive(true, Math.PI / 2);
+    for (let i = 0; i < 270; i += 1) G.step(STEP); // four and a half seconds
+    G.setAutoDrive(false, null);
+    return true;
   }
   if (name === 'marina') {
-    // On foot at the end of Pier 9: boats, containers, cranes, sunset water.
-    game.teleportPlayer(210, 196, -Math.PI / 2);
-    game.setCameraShot(-Math.PI / 2, 0.22, 9);
-    game.startFreeRoam();
-    standStill(game, 1.5);
-    return 'marina';
+    G.startFreeRoam();
+    G.teleport(210, 196, -Math.PI / 2);
+    G.setCameraFixed(222, 5.5, 196, 188, 2, 196);
+    for (let i = 0; i < 90; i += 1) G.step(STEP); // stand still, 1.5 seconds
+    return true;
   }
-  if (name === 'mission') {
-    // Harbor Heist in progress: the crate on Pier 9, rival guards closing in.
-    game.startMission(3, 1);
-    game.teleportPlayer(224, 188, -0.64);
-    game.setCameraShot(-0.64, 0.3, 12);
-    game.spawnGuardsNear(PLACES.pierEnd.x - 8, PLACES.pierEnd.z - 6, 2);
-    game.setWanted(2);
-    standStill(game, 1.2);
-    return 'mission';
+  if (name === 'finale') {
+    G.startMission(4);
+    G.teleport(24, 168, Math.PI);
+    G.setWanted(4);
+    G.setCameraFixed(24, 6, 184, 18, 5, 155);
+    for (let i = 0; i < 30; i += 1) G.step(STEP);
+    return true;
   }
-  // Default: the cover. A police chase through Downtown with three stars,
-  // the mission objective on screen and the minimap lit up. The car flees
-  // EAST along Marina Docks street (z=131) — a real street, so it stays at
-  // speed instead of pinning against a block building the way a northward
-  // run did. After the drive the camera swings in front of the car and
-  // looks back west, so the pursuing cop cars are in the frame behind it
-  // (a chase camera behind the car would leave them behind the lens).
-  game.startMission(0, 0);
-  game.teleportPlayer(0, 130, Math.PI / 2);
-  game.spawnPlayerCar('sedan', 0x2e6ab0);
-  game.setWanted(3);
-  game.setCameraShot(Math.PI / 2, 0.3, 12);
-  driveForward(game, STEP, 7, Math.PI / 2);
-  // The chase outruns the cops (the sedan is faster than a cruiser), so
-  // pull them in behind the car for the frame — they are the pursuit.
-  game.pullCopsNear();
-  // Flip the camera after the drive (no steps after it: updateCamera would
-  // ease the angle back behind the car on every step).
-  game.setCameraShot((3 * Math.PI) / 2, 0.3, 13);
-  return 'chase';
+  return false;
 }
