@@ -1,4 +1,4 @@
-// rng.js — a tiny seeded generator so one seed always builds one city.
+// rng.js — seeded random numbers (Mulberry32) driving the whole city build.
 export class RNG {
   constructor(seed = 42) {
     this.s = (seed >>> 0) || 1;
