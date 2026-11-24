@@ -1,4 +1,4 @@
-// audio.js — every sound is synthesized live with WebAudio; no audio files.
+// audio.js — all sound synthesized live with WebAudio. No audio files.
 export class AudioSys {
   constructor() {
     this.ctx = null;
@@ -37,8 +37,8 @@ export class AudioSys {
     }
   }
   setMuted(m) {
-    this.muted = m;
-    if (this.master) this.master.gain.value = m ? 0 : 0.35;
+    this.muted = !!m;
+    if (this.master) this.master.gain.value = this.muted ? 0 : 0.35;
   }
   engine(speedNorm, inCar) {
     if (!this.ctx || !this.engineGain || !this.engineOsc) return;
@@ -49,17 +49,17 @@ export class AudioSys {
   blip(freq, dur, type = 'sine', vol = 0.25, when = 0) {
     if (!this.ctx || this.muted) return;
     try {
-      const t0 = this.ctx.currentTime + when;
+      const t = this.ctx.currentTime + when;
       const o = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       o.type = type;
       o.frequency.value = freq;
-      g.gain.setValueAtTime(vol, t0);
-      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
       o.connect(g);
       g.connect(this.master);
-      o.start(t0);
-      o.stop(t0 + dur + 0.05);
+      o.start(t);
+      o.stop(t + dur + 0.05);
     } catch (e) {}
   }
   noise(dur, vol = 0.3, freq = 1200) {
@@ -71,13 +71,13 @@ export class AudioSys {
       for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
-      const filt = this.ctx.createBiquadFilter();
-      filt.type = 'lowpass';
-      filt.frequency.value = freq;
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = freq;
       const g = this.ctx.createGain();
       g.gain.value = vol;
-      src.connect(filt);
-      filt.connect(g);
+      src.connect(f);
+      f.connect(g);
       g.connect(this.master);
       src.start();
     } catch (e) {}
