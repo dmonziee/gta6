@@ -1,6 +1,6 @@
-[![gta6-01 bounty](https://make.fun/bounty/gta6-01/badge)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
-[![rank](https://make.fun/u/dmonziee/repo/gta6/rank-badge)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
-[![reward](https://make.fun/bounty/gta6-01/reward-badge)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![rank](https://make.fun/badge/gta6-01/dmonziee/gta6/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![reward](https://make.fun/badge/gta6-01/dmonziee/gta6/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
 # Solmar Bay — an open-world crime story
 
@@ -81,3 +81,5 @@ Four staged frames taken headlessly from the real game with seed 44 (see `shots.
 2. **2-airport.jpg** — Rico on foot at the airport terminal with the runway behind him.
 3. **3-marina.jpg** — Rico standing at the end of Pier 9, boats bobbing beside him.
 4. **4-mission.jpg** — Rico at Casino Solmar's door at four stars, the finale about to begin.
+
+Made for the [gta6-01 bounty](https://make.fun/bounty/gta6-01) on make.fun — enter with https://make.fun/r/fret8z8g.
