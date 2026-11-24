@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Solmar Bay — an open-world crime story</title>
 <style>
@@ -9,56 +9,52 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1210; font-family: 'Segoe UI', Arial, sans-serif; }
   #game { position: fixed; inset: 0; }
   #game canvas { display: block; }
-
-  /* --- HUD --- */
-  #hud { position: fixed; inset: 0; pointer-events: none; display: none; color: #fff; z-index: 5; }
-  #stats { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,0.55); padding: 10px 14px; border-radius: 8px; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; z-index: 5; display: none; }
+  .panel { background: rgba(0,0,0,0.55); border-radius: 8px; padding: 10px 14px; }
+  #stats { position: absolute; top: 14px; left: 14px; }
   #playerName { font-size: 13px; letter-spacing: 2px; color: #ffd76a; font-weight: bold; }
-  #cash { font-size: 26px; font-weight: bold; margin-top: 2px; }
-  #healthBar { width: 170px; height: 10px; background: rgba(255,255,255,0.25); border-radius: 5px; margin-top: 6px; overflow: hidden; }
-  #healthFill { height: 100%; width: 100%; background: #3aff7a; border-radius: 5px; }
-  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 9px 18px; border-radius: 8px; font-size: 15px; max-width: 46%; text-align: center; border-bottom: 2px solid #ffd76a; }
-  #wantedBox { position: absolute; top: 14px; right: 14px; text-align: right; background: rgba(0,0,0,0.55); padding: 10px 14px; border-radius: 8px; }
-  #stars { font-size: 24px; letter-spacing: 3px; }
-  #clock { font-size: 15px; color: #ffd76a; margin-top: 2px; }
-  #district { font-size: 13px; color: #ddd; margin-top: 2px; }
-  #minimap { position: absolute; left: 14px; bottom: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.5); }
-  #speedBox { position: absolute; right: 16px; bottom: 14px; text-align: right; }
-  #speed { font-size: 30px; font-weight: bold; text-shadow: 0 2px 6px rgba(0,0,0,0.8); }
-  #carHealth { font-size: 15px; font-weight: bold; margin-top: 2px; text-shadow: 0 2px 6px rgba(0,0,0,0.8); }
-  #dialogue { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); max-width: 640px; background: rgba(10,10,16,0.78); border-left: 4px solid #ffd76a; padding: 12px 16px; border-radius: 6px; font-size: 15px; line-height: 1.45; display: none; }
+  #cash { font-size: 26px; font-weight: bold; }
+  #healthBar { width: 170px; height: 10px; background: rgba(255,255,255,0.25); border-radius: 5px; overflow: hidden; margin-top: 6px; }
+  #healthFill { height: 100%; width: 100%; background: #3aff7a; }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: 46%; text-align: center; border-bottom: 2px solid #ffd76a; font-size: 15px; padding-bottom: 6px; }
+  #wantedBox { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #stars { font-size: 24px; letter-spacing: 3px; color: #888888; }
+  #clock { font-size: 15px; color: #ffd76a; }
+  #district { font-size: 13px; color: #cccccc; }
+  #minimap { position: absolute; left: 14px; bottom: 14px; width: 170px; height: 170px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.55); }
+  #speedBox { position: absolute; right: 16px; bottom: 16px; text-align: right; }
+  #speed { font-size: 30px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+  #carHealth { font-size: 15px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+  #dialogue { position: absolute; left: 50%; bottom: 110px; transform: translateX(-50%); max-width: 640px; background: rgba(0,0,0,0.78); border-left: 4px solid #ffd76a; padding: 12px 16px; font-size: 15px; line-height: 1.45; display: none; }
   #toasts { position: absolute; left: 50%; bottom: 190px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .toast { background: rgba(0,0,0,0.7); border: 1px solid rgba(255,215,106,0.5); padding: 8px 16px; border-radius: 20px; font-size: 14px; white-space: nowrap; }
-
-  /* --- screens --- */
-  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; color: #fff; text-align: center; }
-  #titleScreen { background: linear-gradient(180deg, rgba(20,8,20,0.55) 0%, rgba(60,20,10,0.75) 60%, rgba(10,10,20,0.9) 100%); }
+  .toast { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,215,106,0.5); padding: 8px 16px; border-radius: 20px; font-size: 14px; white-space: nowrap; }
+  #hint { position: fixed; right: 14px; top: 110px; font-size: 12px; text-align: right; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: none; line-height: 1.6; z-index: 5; }
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; color: #fff; text-align: center; padding: 20px; }
+  #titleScreen { display: flex; background: linear-gradient(180deg, rgba(60,30,60,0.55), rgba(80,40,20,0.75), rgba(10,10,30,0.9)); }
   #titleScreen h1 { font-size: 72px; letter-spacing: 10px; color: #ffd76a; text-shadow: 0 4px 0 #8a2a2a, 0 8px 30px rgba(0,0,0,0.9); }
-  #titleScreen h2 { font-size: 19px; letter-spacing: 4px; color: #ffb13a; margin-top: 6px; font-weight: normal; }
-  #titleScreen p { margin-top: 18px; font-size: 15px; color: #eee; max-width: 560px; line-height: 1.6; }
-  .menuBtn { pointer-events: auto; cursor: pointer; margin-top: 26px; padding: 14px 44px; font-size: 18px; font-weight: bold; letter-spacing: 2px; color: #1a1210; background: #ffd76a; border: none; border-radius: 8px; }
+  #titleScreen h2 { font-size: 19px; letter-spacing: 4px; color: #ffb13a; margin-top: 8px; }
+  #titleScreen p { max-width: 620px; margin: 22px 0; font-size: 16px; line-height: 1.6; color: #eeeeee; }
+  .menuBtn { background: #ffd76a; color: #1a1210; padding: 14px 44px; font-size: 18px; font-weight: bold; letter-spacing: 2px; border: none; border-radius: 8px; cursor: pointer; margin: 6px; }
   .menuBtn:hover { background: #ffe19a; }
   .menuBtn.secondary { background: transparent; color: #ffd76a; border: 2px solid #ffd76a; }
-  #deadScreen { background: rgba(40,0,0,0.82); display: none; }
-  #deadScreen h1 { font-size: 84px; letter-spacing: 14px; color: #ff4a4a; text-shadow: 0 6px 30px rgba(0,0,0,0.9); }
-  #deadScreen p { margin-top: 12px; font-size: 16px; color: #eee; }
-  #pauseScreen { background: rgba(0,0,0,0.6); display: none; }
+  #deadScreen { background: rgba(80,0,0,0.82); }
+  #deadScreen h1 { font-size: 84px; letter-spacing: 14px; color: #ff4a4a; }
+  #deadScreen p { margin: 18px 0; font-size: 16px; }
+  #pauseScreen { background: rgba(0,0,0,0.6); }
   #pauseScreen h1 { font-size: 48px; letter-spacing: 8px; color: #ffd76a; }
-  #pauseScreen p { margin-top: 10px; color: #ddd; font-size: 15px; line-height: 1.7; }
-  #hint { position: fixed; right: 14px; top: 110px; color: rgba(255,255,255,0.75); font-size: 12px; text-align: right; line-height: 1.7; z-index: 5; text-shadow: 0 1px 4px rgba(0,0,0,0.9); pointer-events: none; }
+  #pauseScreen p { margin: 18px 0; font-size: 16px; line-height: 1.7; }
 </style>
 </head>
 <body>
 <div id="game"></div>
-
 <div id="hud">
-  <div id="stats">
+  <div id="stats" class="panel">
     <div id="playerName">RICO MARIN</div>
     <div id="cash">$0</div>
     <div id="healthBar"><div id="healthFill"></div></div>
   </div>
-  <div id="objective">Explore Solmar Bay</div>
-  <div id="wantedBox">
+  <div id="objective" class="panel">Explore Solmar Bay</div>
+  <div id="wantedBox" class="panel">
     <div id="stars">☆☆☆☆☆</div>
     <div id="clock">18:30</div>
     <div id="district">Solmar Bay</div>
@@ -71,31 +67,23 @@
   <div id="dialogue"><span id="dialogueText"></span></div>
   <div id="toasts"></div>
 </div>
-<div id="hint">WASD drive &amp; walk · Shift run<br>E enter / interact · F punch · 1/2 weapons<br>R reload · T taxi · P pause · M mute<br>Drag to orbit · Wheel to zoom</div>
-
+<div id="hint">WASD / Arrows — move &amp; drive<br>Shift — run &nbsp; E — enter / interact<br>F — punch &nbsp; Click — shoot (pistol)<br>1 / 2 — fists / pistol &nbsp; R — reload<br>T — taxi fare &nbsp; P — pause &nbsp; M — mute<br>Drag — orbit camera &nbsp; Wheel — zoom</div>
 <div id="titleScreen" class="screen">
   <h1>SOLMAR BAY</h1>
   <h2>AN OPEN-WORLD CRIME STORY</h2>
-  <p>You are Rico Marin, a wheelman who owes Lena Cruz one last favour. Five jobs
-  stand between Rico and a clean slate — ending in a $3,500 casino vault crack
-  at four stars of police heat. Drive, run and steal across a sun-soaked city
-  on the water: downtown towers, old-town streets, a working marina, and the
-  glittering new Casino Row.</p>
+  <p>Rico Marin owes Lena Cruz one last favour, and the debt comes due in Solmar Bay — a sun-soaked city on the water, where downtown towers, old-town streets, a working marina, Casino Row and a busy little airport all answer to whoever holds the wheel. Six jobs stand between Rico and a clean slate, ending in a 3,500 dollar casino vault crack at four stars — and a 4,500 dollar airlift after that.</p>
   <button id="newGameBtn" class="menuBtn">NEW GAME</button>
   <button id="continueBtn" class="menuBtn secondary">CONTINUE</button>
 </div>
-
 <div id="deadScreen" class="screen">
   <h1>WASTED</h1>
-  <p>Rico went down. Retry costs 10% of your cash and restarts the active job.</p>
+  <p>Rico went down. Retrying costs 10% of your cash and restarts the active job.</p>
   <button id="retryBtn" class="menuBtn">RETRY</button>
 </div>
-
 <div id="pauseScreen" class="screen">
   <h1>PAUSED</h1>
-  <p>Press P to keep playing.<br>WASD move &amp; drive · E enter / interact · F punch<br>1 fists · 2 pistol · R reload · T taxi · M mute</p>
+  <p>Press P to resume.<br>WASD / Arrows — move &amp; drive &nbsp; Shift — run &nbsp; E — enter / interact<br>F — punch &nbsp; Click — shoot (pistol) &nbsp; 1 / 2 — fists / pistol<br>R — reload &nbsp; T — taxi fare &nbsp; M — mute &nbsp; Drag — orbit &nbsp; Wheel — zoom</p>
 </div>
-
 <script src="vendor/three.min.js"></script>
 <script type="module" src="src/main.js"></script>
 </body>
